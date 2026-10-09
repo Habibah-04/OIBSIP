@@ -1,0 +1,6 @@
+{
+  "custom_commands": {
+    "open github": "https://github.com",
+    "open youtube": "https://youtube.com"
+  }
+}
