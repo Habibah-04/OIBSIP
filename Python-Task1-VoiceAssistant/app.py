@@ -23,7 +23,8 @@ class AssistantApp:
         root.title(APP)
         root.geometry("820x650")
         root.minsize(700, 560)
-        self.engine = pyttsx3.init()
+        self.engine = None
+        self.speech_lock = threading.Lock()
         self.recognizer = sr.Recognizer()
         self.reminders = []
         self.custom_commands = self.load_commands()
@@ -51,7 +52,7 @@ class AssistantApp:
 
     def build(self):
         header = ttk.Frame(self.root, padding=(24, 22, 24, 10)); header.pack(fill="x")
-        ttk.Label(header, text="VOICE / ASSISTANT", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(header, text="VOICE ASSISTANT", style="Title.TLabel").pack(anchor="w")
         ttk.Label(header, text="Speak naturally, set reminders, check weather, search the web.", style="Muted.TLabel").pack(anchor="w", pady=(4, 0))
         panel = ttk.Frame(self.root, style="Panel.TFrame", padding=16); panel.pack(fill="both", expand=True, padx=24, pady=12)
         self.log = tk.Text(panel, height=18, bg="#0e1727", fg=self.fg, insertbackground=self.fg,
@@ -69,16 +70,39 @@ class AssistantApp:
     def log_msg(self, who, text):
         self.log.insert("end", f"{who}: {text}\n\n"); self.log.see("end")
 
+    
     def say(self, text):
-        self.log_msg("Assistant", text)
-        threading.Thread(target=self._speak, args=(text,), daemon=True).start()
+          """Display the response and queue its speech."""
+          self.log_msg("Assistant", text)
+          threading.Thread(
+                  target=self._speak,
+                  args=(text,),
+                  daemon=True
+          ).start()
+
 
     def _speak(self, text):
-        try:
-            self.engine.say(text); self.engine.runAndWait()
-        except Exception:
-            pass
+          """Speak responses sequentially using Windows SAPI5."""
+          if not text or not str(text).strip():
+                 return
 
+          try:
+                # Prevent two responses from speaking simultaneously.
+                with self.speech_lock:
+                        import pyttsx3
+
+                        print(f"Assistant speaking: {text}")
+
+                        engine = pyttsx3.init(driverName="sapi5")
+                        engine.setProperty("volume", 1.0)
+                        engine.setProperty("rate", 170)
+                        engine.say(str(text))
+                        engine.runAndWait()
+                        engine.stop()
+
+          except Exception as e:
+                  print(f"Speech error: {e}")
+    
     def load_commands(self):
         try:
             return json.loads(CONFIG_PATH.read_text(encoding="utf-8")).get("custom_commands", {})
